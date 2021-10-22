@@ -1,4 +1,11 @@
-## Convert-OutputForCSV is created by Boe Prox (GITHUB proxb - https://github.com/proxb/PowerShell_Scripts/blob/master/Convert-OutputForCSV.ps1); all credit goes to him for the Convert-OutputForCSV function)
+## Attribution Comments
+# 
+# Convert-OutputForCSV is created by Boe Prox (GITHUB proxb - https://github.com/proxb/PowerShell_Scripts/blob/master/Convert-OutputForCSV.ps1) 
+# all credit goes to him for the Convert-OutputForCSV function)
+# 
+# Modified Convert-OutputForCSV for SemiColon functionality
+#
+## End Attribution Comments
 
 Function Convert-OutputForCSV {
     <#
@@ -49,7 +56,7 @@ Function Convert-OutputForCSV {
         [parameter(ValueFromPipeline)]
         [psobject]$InputObject,
         [parameter()]
-        [ValidateSet('Stack','Comma')]
+        [ValidateSet('Stack','SemiColon')]
         [string]$OutputPropertyType = 'Stack'
     )
     Begin {
@@ -84,10 +91,12 @@ Function Convert-OutputForCSV {
 
             $OutputOrder | ForEach {
                 If ($OutputPropertyType -eq 'Stack') {
-                    $Null = $stringBuilder.AppendLine("`"$($_)`" = `"$(($line.$($_) | Out-String).Trim())`"")
-                } ElseIf ($OutputPropertyType -eq "Comma") {
-                    $Null = $stringBuilder.AppendLine("`"$($_)`" = `"$($line.$($_) -join ', ')`"")                   
+                    $Null = $stringBuilder.AppendLine("`"$($_)`" = `"$(($line.$($_) | Out-String).Trim())`"")                 
+                } 
+                ElseIf ($OutputPropertyType -eq "SemiColon") {
+                    $Null = $stringBuilder.AppendLine("`"$($_)`" = `"$($line.$($_) -join '; ')`"")                   
                 }
+
             }
             $Null = $stringBuilder.AppendLine("}")
  
@@ -97,52 +106,68 @@ Function Convert-OutputForCSV {
     End {}
 }
 
-#Replace the following variables with your own environment
-$nsxserver = 'https://nsx01.projectonestone.io'
-$username = 'admin'
-$password = 'VMware1!VMware1!'
+#region // User-Specific Environmental Variables for NSX-T
+
+    #Replace the following variables with your own environment
+    $nsxserver = 'nsx01.projectonestone.io'
+    $username = 'admin'
+    $password = 'VMware1!VMware1!'
+
+    #Do not modify the following four lines
+    $auth = $username + ':' + $password
+
+    $Encoded = [System.Text.Encoding]::UTF8.GetBytes($auth)
+    $EncodedPassword = [System.Convert]::ToBase64String($Encoded)
+
+    $headers = @{"Authorization"="Basic $($EncodedPassword)"}
+
+#endregion
+
+#region // Variables for file creation
+
+    $dfwexport = "$env:userprofile\desktop\dfwexport.csv"
+    $dfwexport1 = "$env:userprofile\desktop\dfwexport1.csv"
+    $dfwexport2 = "$env:userprofile\desktop\dfwexport2.csv"
+    $nsgroups = "$env:userprofile\desktop\nsgroups.csv"
+    $nsgroupvmmembers = "$env:userprofile\desktop\nsgroupsvmmembers.csv"
+    $nsgroupipmembers = "$env:userprofile\desktop\nsgroupsipmembers.csv"
+    $nsservices = "$env:USERPROFILE\desktop\nsx-services.csv"
+    $mergedxlsx = "$env:userprofile\desktop\DFW-Export.xlsx"
+
+#endregion 
+
+#region // Clean up stale files from previous deployment
+
+    Remove-Item -Path $dfwexport -Confirm:$false -Force -ErrorAction Ignore
+    Remove-Item -Path $dfwexport1 -Confirm:$false -Force -ErrorAction Ignore
+    Remove-Item -Path $dfwexport2 -Confirm:$false -Force -ErrorAction Ignore
+    Remove-Item -Path $nsgroups -Confirm:$false -Force -ErrorAction Ignore
+    Remove-Item -Path $nsservices -Confirm:$false -Force -ErrorAction Ignore 
+    Remove-Item -Path $mergedxlsx -Confirm:$false -Force -ErrorAction Ignore
+    Remove-Item -Path $nsgroups -Confirm:$false -Force -ErrorAction Ignore
+    Remove-Item -Path $nsgroupvmmembers -Confirm:$false -Force -ErrorAction Ignore
+    Remove-Item -Path $nsgroupipmembers -Confirm:$false -Force -ErrorAction Ignore
+
+#endregion
+
+#region // Connect to the NSX-T Manager using PowerCLI
+
+    Write-Host "`r`nConnecting to the NSX-T Manager Appliance.`r`nThis process takes approximately 1-2 min... " -ForegroundColor Yellow
+    Connect-NsxtServer -server $nsxserver -User $username -Password $password
+    Write-Host "`nConnected to NSX-T Manager Appliance. Starting Export..." -ForegroundColor Yellow
 
 
-#Begin Script
+#endregion
 
-$dfwexport = "$env:userprofile\desktop\dfwexport.csv"
-$dfwexport1 = "$env:userprofile\desktop\dfwexport1.csv"
-$dfwexport2 = "$env:userprofile\desktop\dfwexport2.csv"
-$nsgroups = "$env:userprofile\desktop\nsgroups.csv"
-$nsgroupvmmembers = "$env:userprofile\desktop\nsgroupsvmmembers.csv"
-$nsgroupipmembers = "$env:userprofile\desktop\nsgroupipmembers.csv"
-$nsservices = "$env:USERPROFILE\desktop\nsx-services.csv"
-$mergedxlsx = "$env:userprofile\desktop\DFW-Export.xlsx"
-
-
-Remove-Item -Path $dfwexport -Confirm:$false -Force -ErrorAction Ignore
-Remove-Item -Path $dfwexport1 -Confirm:$false -Force -ErrorAction Ignore
-Remove-Item -Path $dfwexport2 -Confirm:$false -Force -ErrorAction Ignore
-Remove-Item -Path $nsgroups -Confirm:$false -Force -ErrorAction Ignore
-Remove-Item -Path $nsservices -Confirm:$false -Force -ErrorAction Ignore 
-Remove-Item -Path $mergedxlsx -Confirm:$false -Force -ErrorAction Ignore
-Remove-Item -Path $nsgroups -Confirm:$false -Force -ErrorAction Ignore
-Remove-Item -Path $nsgroupvmmembers -Confirm:$false -Force -ErrorAction Ignore
-Remove-Item -Path $nsgroupipmembers -Confirm:$false -Force -ErrorAction Ignore
-
-$auth = $username + ':' + $password
-
-$Encoded = [System.Text.Encoding]::UTF8.GetBytes($auth)
-$EncodedPassword = [System.Convert]::ToBase64String($Encoded)
-
-$headers = @{"Authorization"="Basic $($EncodedPassword)"}
-
-
-
- 
- #region // DFW Rules Export
- Write-Host "Exporting: DFW Rules..." -ForegroundColor Yellow
+#region // DFW Rules Export
+    
+    Write-Host "`r`nExporting: DFW Rules..." -ForegroundColor Yellow
 
 
     #region // Variables to invoke RestAPI call to pull security policies and ruleset identifiers
 
-        $nsxpolicies = Invoke-RestMethod -Method Get -Uri "$nsxserver/policy/api/v1/infra/domains/default/security-policies" -Header $headers
-        $nsxdfwrules = foreach ($id in $nsxpolicies.results) {Invoke-RestMethod -Method Get -Uri "$nsxserver/policy/api/v1/infra/domains/default/security-policies/$($id.id)/rules" -Header $headers}
+        $nsxpolicies = Invoke-RestMethod -Method Get -Uri "https://$nsxserver/policy/api/v1/infra/domains/default/security-policies" -Header $headers
+        $nsxdfwrules = foreach ($id in $nsxpolicies.results) {Invoke-RestMethod -Method Get -Uri "https://$nsxserver/policy/api/v1/infra/domains/default/security-policies/$($id.id)/rules" -Header $headers}
 
     #endregion 
 
@@ -152,21 +177,19 @@ $headers = @{"Authorization"="Basic $($EncodedPassword)"}
         ForEach ($rule in $nsxdfwrules.results) {
 
             $output = 'id','display_name','description','source_groups','destination_groups','services','scope','action'
-            $rule | Select-Object -Property $output | Convert-OutputForCSV -OutputPropertyType Comma | Export-Csv -Path $dfwexport -NoTypeInformation -Encoding UTF8 -Append
+            $rule | Select-Object -Property $output | Convert-OutputForCSV -OutputPropertyType SemiColon | Export-Csv -Path $dfwexport -NoTypeInformation -Encoding UTF8 -Append
         } 
 
     #endregion
 
 #endregion
 
-
-
 #region // NSGroup Export
 Write-Host "Exporting: NSX Security Groups and VM Members..." -ForegroundColor Yellow
 
     #region // Variables to invoke RestAPI call to pull NSX Security Groups (NSgroups)
         
-        $nsxgroups = Invoke-RestMethod -Method Get -Uri "$nsxserver/policy/api/v1/infra/domains/default/groups" -Header $headers
+        $nsxgroups = Invoke-RestMethod -Method Get -Uri "https://$nsxserver/policy/api/v1/infra/domains/default/groups" -Header $headers
 
     #endregion
 
@@ -175,7 +198,7 @@ Write-Host "Exporting: NSX Security Groups and VM Members..." -ForegroundColor Y
         ForEach ($group in $nsxgroups.results) {
 
             $output = 'path','display_name'
-            $group | Select-Object -Property $output | Convert-OutputForCSV -OutputPropertyType Comma | Export-Csv -Path $nsgroups -NoTypeInformation -Encoding UTF8 -Append
+            $group | Select-Object -Property $output | Convert-OutputForCSV -OutputPropertyType SemiColon | Export-Csv -Path $nsgroups -NoTypeInformation -Encoding UTF8 -Append
 
         }
 
@@ -183,63 +206,52 @@ Write-Host "Exporting: NSX Security Groups and VM Members..." -ForegroundColor Y
 
 #endregion
 
-
-
-#region // NSX Security Group Members Export for DFW rules
+<##region // NSX Security Group Members Export for DFW rules
 
     #region // NSX Group - VM Members
 
-        ForEach ($group in $nsxgroups.results) {
+            $domain_id = "default"     
+            $ns_groupsvc = Get-NsxtPolicyService -Name com.vmware.nsx_policy.infra.domains.groups
+            $ns_groups = $ns_groupsvc.list($domain_id)
+            $ns_group = $ns_groups.results | ft -AutoSize -Property unique_id
 
-            $groupid = $group
-                               
-            $nsxgroupmembers = Invoke-RestMethod -Method Get -Uri "$nsxserver/policy/api/v1/infra/domains/default/groups/$($groupid.id)/members/virtual-machines" -Header $headers 
+            ForEach ($group_id in $ns_group.unique_id) {
 
-            ForEach ($groupmember in $nsxgroupmembers.results) {
+                $vmsetsvc = Get-NsxtService -Name com.vmware.nsx.ns_groups.effective_virtual_machine_members 
 
-                    $output = 'path','host_id','local_id','display_name'     
-                    $groupmember | Select-Object -Property $output | Convert-OutputForCSV -OutputPropertyType Comma | Export-Csv -Path $nsgroupvmmembers -NoTypeInformation -Encoding UTF8 -Append
-            
+                $vmsets = $vmsetsvc.list($group_id)
+                            
+                $vmsets.results | Select-Object -Property * | Convert-OutputForCSV -OutputPropertyType SemiColon | Export-Csv -path $nsgroupvmmembers -NoTypeInformation -Encoding UTF8 -Append
+
             }
-        }
         
     #endregion 
 
-    <# STILL IN DEVELOPMENT 
-
     #region // NSX Group - IP Members
 
-        ForEach ($group in $nsxgroups.results) {
-
-            $groupid = $group
-
-            $nsxgroupmembers = Invoke-RestMethod -Method Get -Uri "$nsxserver/policy/api/v1$($groupid.path)/members/ip-addresses" -Header $headers 
-
-            ForEach ($ipgroupmember in $nsxgroupmembers.results) {
-
-                   $ipgroupmember | Convert-OutputForCSV -OutputPropertyType Comma | Export-Csv -Path $nsgroupipmembers -NoTypeInformation -Append
+        $ipsetsvc = Get-NsxtService -Name com.vmware.nsx.ip_sets
+        $ipsets = $ipsetsvc.list()
+        $ipsets.results | ft -AutoSize -Property id, ip_addresses
             
-            }          
+        ForEach ($ipset in $ipsets.results) {
+
+                $output = 'id','ip_addresses'
+
+                $ipset | Select-Object -Property $output | Convert-OutputForCSV -OutputPropertyType SemiColon | Export-Csv -Path $nsgroupipmembers -NoTypeInformation -Encoding UTF8 -Append
             
-        }
+        }      
 
     #endregion 
-    #>
 
-#endregion
-
-
-
-
-
-
+#endregion#>
 
 #region // NSX Services Export for DFW rules
-Write-Host "Exporting: NSX Service Definitions..." -ForegroundColor Yellow
+
+    Write-Host "Exporting: NSX Service Definitions..." -ForegroundColor Yellow
 
     #region // Variables to invoke RestAPI call to pull NSX Security Groups (NSgroups)
 
-        $nsxservices = Invoke-RestMethod -Method Get -Uri "$nsxserver/policy/api/v1/infra/services" -Header $headers 
+        $nsxservices = Invoke-RestMethod -Method Get -Uri "https://$nsxserver/policy/api/v1/infra/services" -Header $headers 
 
     #endregion 
 
@@ -250,16 +262,13 @@ Write-Host "Exporting: NSX Service Definitions..." -ForegroundColor Yellow
                 ForEach ($service_entry in $service.service_entries) {
                         
                         $output = 'parent_path','display_name','path','id','l4_protocol','source_ports','destination_ports'
-                        $service_entry | Select-Object -Property $output | Convert-OutputForCSV -OutputPropertyType Comma | Export-Csv -Path $nsservices -NoTypeInformation -Encoding UTF8 -Append
+                        $service_entry | Select-Object -Property $output | Convert-OutputForCSV -OutputPropertyType SemiColon | Export-Csv -Path $nsservices -NoTypeInformation -Encoding UTF8 -Append
                 } 
         }
 
     #endregion
 
 #endregion
-
-
-
 
 #region // Create Hash Table from NSGroups
 
@@ -275,8 +284,6 @@ Write-Host "Exporting: NSX Service Definitions..." -ForegroundColor Yellow
     }
     
 #endregion
-
-
 
 #region // Find and Replace in DFW CSV from NSGroups Hash
     
@@ -302,11 +309,8 @@ Write-Host "Exporting: NSX Service Definitions..." -ForegroundColor Yellow
 
 #endregion 
 
-
-
 #region // Create Hash Table from Services
 
-    
     $import2 = Import-Csv $nsservices -Header path,display_name -Encoding UTF8 -Delimiter ","
     
     $servicehash = @{}
@@ -318,8 +322,6 @@ Write-Host "Exporting: NSX Service Definitions..." -ForegroundColor Yellow
     }
     
 #endregion
-
-
 
 #region // Find and Replace in DFW CSV from Services Hash
     
@@ -345,16 +347,14 @@ Write-Host "Exporting: NSX Service Definitions..." -ForegroundColor Yellow
 
 #endregion 
 
-
 #region // Remove Old DFW Export
-
+    
     Remove-Item -Path $dfwexport -Confirm:$false -Force -ErrorAction Ignore
     Remove-Item -Path $dfwexport1 -Confirm:$false -Force -ErrorAction Ignore
-    #Remove-Item -Path $nsgroups -Confirm:$false -Force -ErrorAction Ignore
     Rename-Item -Path $dfwexport2 -NewName $dfwexport -ErrorAction Ignore
+    Write-Host "`r`nExport Complete..." -ForegroundColor Green
 
 #endregion
-
 
 #region // Merge CSV Files into a single Excel Workbook
 
@@ -363,15 +363,15 @@ Write-Host "Exporting: NSX Service Definitions..." -ForegroundColor Yellow
     $csvs = Get-ChildItem $path\* -Include *.csv
     $i=$csvs.Count
         
-    Write-Host "Detected the following CSV files: ($i)" -ForegroundColor Green
+    Write-Host "`r`nDetected the following CSV files: ($i)" -ForegroundColor Yellow
 
-    foreach ($csv in $csvs) {
-        Write-Host " "$csv.Name
-    }
+        foreach ($csv in $csvs) {
+            Write-Host " "$csv.Name
+        }
 
     $outputfilename = "DFW-Export.xlsx"
 
-    Write-Host "Creating: $outputfilename" -ForegroundColor Yellow
+    Write-Host "`r`nCreating: $outputfilename..." -ForegroundColor Yellow
 
     $excelapp = new-object -comobject Excel.Application
     $excelapp.sheetsInNewWorkbook = $csvs.Count
@@ -407,18 +407,24 @@ Write-Host "Exporting: NSX Service Definitions..." -ForegroundColor Yellow
     $output = "$($path)\$($outputfilename)"
     $xlsx.SaveAs($output)
     $excelapp.quit()
-    Write-Host "Object: $($outputfilename) created in $($path) on $(get-date -f yyyy-MM-ddTHH:mm:ss:ff)" -ForegroundColor Yellow
+    Write-Host "`r`nObject: $($outputfilename) created in $($path) on $(get-date -f yyyy-MM-ddTHH:mm:ss:ff)" -ForegroundColor Green
 
 #endregion
 
-    Write-Host "Cleaning up files..." -ForegroundColor White
+#region // Clean up files and Disconnect from NSX-T
 
+    Write-Host "`nCleaning up files..." -ForegroundColor White
+    
     Remove-Item -Path $dfwexport -Confirm:$false -Force -ErrorAction Ignore
     Remove-Item -Path $nsgroups -Confirm:$false -Force -ErrorAction Ignore
     Remove-Item -Path $nsservices -Confirm:$false -Force -ErrorAction Ignore 
     Remove-Item -Path $nsgroupvmmembers -Confirm:$false -Force -ErrorAction Ignore
     Remove-Item -Path $nsgroupipmembers -Confirm:$false -Force -ErrorAction Ignore
+    
+    Write-Host "`nDisconnecting NSX-T Servers" -ForegroundColor Yellow
 
-    Write-Host "Process Complete." -ForegroundColor Yellow
+    Disconnect-NsxtServer -Server * -Confirm:$false
 
-#End Script
+    Write-Host "`nProcess Complete." -ForegroundColor Green
+
+#endregion
